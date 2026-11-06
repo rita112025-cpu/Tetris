@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>礦坑方塊</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* Layout: one-screen cave — the well (board) fills the middle, a stone inventory column on the right, a row of stone buttons below on touch screens. */
+:root{
+  --cave:#121317;
+  --panel:#2a2b30;
+  --slot:#18191d;
+  --hi:#6a6c74;
+  --lo:#08080a;
+  --btn:#585a62;
+  --btn-hover:#686a73;
+  --text:#ece9df;
+  --muted:#9d9a90;
+  --gold:#f2c94c;
+  --emerald:#46d47d;
+  --danger:#e8604c;
+  --font:"DotGothic16","PingFang TC","Noto Sans TC","Microsoft JhengHei",monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  background-color:var(--cave);
+  color:var(--text);
+  font-family:var(--font);
+  image-rendering:pixelated;
+  overflow:hidden;
+  -webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.app{
+  height:100%;
+  max-width:760px;margin:0 auto;
+  display:flex;flex-direction:column;gap:10px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:10px;
+  box-sizing:border-box;
+}
+header{display:flex;align-items:center;gap:10px}
+header h1{
+  margin:0;font-size:22px;font-weight:400;letter-spacing:.06em;
+  color:var(--text);text-shadow:2px 2px 0 var(--lo);
+  flex:1;min-width:0;
+}
+header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-left:6px;text-shadow:none}
+
+.mc-btn{
+  font-family:var(--font);font-size:15px;color:var(--text);
+  background:var(--btn);
+  border:3px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);
+  text-shadow:2px 2px 0 #222;
+  padding:6px 12px;cursor:pointer;
+  box-shadow:0 0 0 2px #000;
+}
+.mc-btn:hover{background:var(--btn-hover)}
+.mc-btn:active,.mc-btn.on{border-color:var(--lo) var(--hi) var(--hi) var(--lo);background:#4b4d54}
+.mc-btn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.mc-btn.icon{width:40px;height:40px;padding:0;display:grid;place-items:center}
+.mc-btn svg{width:18px;height:18px;fill:currentColor;display:block}
+.mc-btn.off{color:var(--muted)}
+
+.stage{flex:1 1 0;min-height:0;display:flex;gap:10px}
+.well{flex:1 1 0;min-width:0;min-height:0;position:relative}
+.frame{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  box-shadow:0 0 0 3px var(--lo),0 0 0 6px var(--hi),0 0 0 9px var(--lo);
+}
+#board{display:block;touch-action:none}
+.overlay{
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(8,8,10,.62);
+}
+.card{
+  width:calc(100% - 24px);max-width:260px;box-sizing:border-box;
+  background:var(--panel);
+  border:3px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);
+  box-shadow:0 0 0 2px #000;
+  padding:16px 14px;text-align:center;
+  display:flex;flex-direction:column;gap:10px;align-items:center;
+}
+.card h2{margin:0;font-weight:400;font-size:24px;text-shadow:2px 2px 0 var(--lo);text-wrap:balance}
+.card h2.lose{color:var(--danger)}
+.card p{margin:0;font-size:13px;line-height:1.6;color:var(--muted)}
+.card .big{font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums}
+.card .mc-btn{font-size:17px;padding:8px 18px}
+
+.side{
+  width:clamp(98px,27vw,184px);flex:none;
+  display:flex;flex-direction:column;gap:8px;
+  overflow-y:auto;min-height:0;
+}
+.box{
+  background:var(--panel);
+  border:3px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);
+  box-shadow:0 0 0 2px #000;
+  padding:6px;
+}
+.box h3{margin:0 0 4px;font-weight:400;font-size:12px;letter-spacing:.12em;color:var(--muted)}
+.box canvas{display:block;width:100%;background:var(--slot);
+  box-shadow:inset 2px 2px 0 var(--lo),inset -2px -2px 0 var(--hi)}
+.stats{display:grid;gap:4px}
+.stat{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:12px;color:var(--muted)}
+.stat b{font-weight:400;font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
+.stat.score b{color:var(--gold)}
+.stat.depth b{color:var(--emerald)}
+.inv{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:4px}
+.slot{
+  position:relative;aspect-ratio:1;max-width:100%;
+  background:var(--slot);
+  box-shadow:inset 2px 2px 0 var(--lo),inset -2px -2px 0 var(--hi);
+  display:grid;place-items:center;
+}
+.slot img{width:62%;height:62%;image-rendering:pixelated;display:block}
+.slot span{
+  position:absolute;right:3px;bottom:1px;font-size:12px;
+  color:#fff;text-shadow:1px 1px 0 #3a3a3a;font-variant-numeric:tabular-nums;
+}
+.slot.empty img{opacity:.25}
+.slot.empty span{display:none}
+
+.pad{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:8px;
+  touch-action:none;flex:none;
+}
+.pad .mc-btn{height:62px;padding:0;display:grid;place-items:center;font-size:15px}
+.pad .mc-btn svg{width:24px;height:24px}
+.pad .gap{margin-left:6px}
+.keys{display:none;font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+.keys kbd{font-family:var(--font);color:var(--text);background:var(--slot);padding:0 5px;
+  box-shadow:inset -1px -1px 0 var(--lo),inset 1px 1px 0 var(--hi)}
+@media (hover:hover) and (pointer:fine){
+  .pad{display:none}
+  .keys{display:block}
+}
+@media (max-width:360px){
+  .pad .mc-btn{height:54px}
+  header h1 small{display:none}
+}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font-size:14px}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<main class="app">
+  <header>
+    <h1>礦坑方塊<small>MINE · STACK</small></h1>
+    <button class="mc-btn icon" id="soundBtn" type="button" aria-label="音效開關" title="音效">
+      <svg viewBox="0 0 16 16"><path d="M2 6h3l4-3v10l-4-3H2zM11 5h1v1h1v4h-1v1h-1v-1h1V6h-1z"/></svg>
+    </button>
+    <button class="mc-btn icon" id="pauseBtn" type="button" aria-label="暫停" title="暫停（P）">
+      <svg viewBox="0 0 16 16"><path d="M4 3h3v10H4zM9 3h3v10H9z"/></svg>
+    </button>
+  </header>
+
+  <section class="stage">
+    <div class="well" id="well">
+      <div class="frame" id="frame">
+        <canvas id="board" aria-label="遊戲盤面"></canvas>
+        <div class="overlay" id="ov">
+          <div class="card">
+            <h2 id="ovTitle">礦坑方塊</h2>
+            <p id="ovText">每種方塊都是一種礦物。<br>消除一行就往下挖一格。</p>
+            <div class="big" id="ovScore" hidden></div>
+            <button class="mc-btn" id="ovBtn" type="button">開始挖礦</button>
+            <p id="ovBest"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="box"><h3>暫存</h3><canvas id="holdCv"></canvas></div>
+      <div class="box"><h3>下一個</h3><canvas id="nextCv"></canvas></div>
+      <div class="box stats">
+        <div class="stat score">分數<b id="sScore">0</b></div>
+        <div class="stat">等級<b id="sLevel">1</b></div>
+        <div class="stat">行數<b id="sLines">0</b></div>
+        <div class="stat depth">深度<b id="sDepth">Y 64</b></div>
+      </div>
+      <div class="box"><h3>背包</h3><div class="inv" id="inv"></div></div>
+    </aside>
+  </section>
+
+  <nav class="pad" id="pad" aria-label="操作按鈕">
+    <button class="mc-btn" type="button" data-act="left" aria-label="左移"><svg viewBox="0 0 16 16"><path d="M10 2h2v12h-2v-2H8v-2H6V8h0V6h2V4h2z M4 7h2v2H4z"/></svg></button>
+    <button class="mc-btn" type="button" data-act="down" aria-label="下移"><svg viewBox="0 0 16 16"><path d="M2 4h12v2h-2v2h-2v2H6V8H4V6H2zM7 10h2v2H7z"/></svg></button>
+    <button class="mc-btn" type="button" data-act="right" aria-label="右移"><svg viewBox="0 0 16 16"><path d="M4 2h2v2h2v2h2v4H8v2H6v2H4zM10 7h2v2h-2z"/></svg></button>
+    <button class="mc-btn gap" type="button" data-act="hold">暫存</button>
+    <button class="mc-btn" type="button" data-act="rotate" aria-label="旋轉"><svg viewBox="0 0 16 16"><path d="M5 3h6v2h2v6h-2v2H5v-2H3V9h2v2h6V5H7v2H5V5H3V3h2zM3 5h2v4H3z" /><path d="M1 5h6v2H5v2H3V7H1z"/></svg></button>
+    <button class="mc-btn" type="button" data-act="drop">落下</button>
+  </nav>
+
+  <p class="keys">
+    <kbd>←</kbd><kbd>→</kbd> 移動　<kbd>↓</kbd> 加速　<kbd>↑</kbd>/<kbd>X</kbd> 旋轉　<kbd>Z</kbd> 反轉<br>
+    <kbd>空白</kbd> 直接落下　<kbd>C</kbd> 暫存　<kbd>P</kbd> 暫停
+  </p>
+</main>
+
+<script>
+(() => {
+'use strict';
+const COLS = 10, ROWS = 20;
+const SHAPES = {
+  I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O: [[1,1],[1,1]],
+  T: [[0,1,0],[1,1,1],[0,0,0]],
+  S: [[0,1,1],[1,1,0],[0,0,0]],
+  Z: [[1,1,0],[0,1,1],[0,0,0]],
+  J: [[1,0,0],[1,1,1],[0,0,0]],
+  L: [[0,0,1],[1,1,1],[0,0,0]],
+};
+const TYPES = Object.keys(SHAPES);
+const MAT = { I:'diamond', O:'gold', T:'amethyst', S:'grass', Z:'brick', J:'lapis', L:'planks' };
+const NAME = { I:'鑽石礦', O:'金磚', T:'紫水晶', S:'草方塊', Z:'紅磚', J:'青金石礦', L:'橡木材' };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- pixel textures (16x16, generated) ---------- */
+function rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+
+function makeTex(kind, seed){
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const x = c.getContext('2d'); const r = rng(seed);
+  const px = (i, j, col) => { x.fillStyle = col; x.fillRect(i, j, 1, 1); };
+  const sh = (b, v) => `rgb(${clamp(b[0]+v)},${clamp(b[1]+v)},${clamp(b[2]+v)})`;
+  const noise = (b, amp, rows) => { for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++)
+    if (!rows || rows(i, j)) px(i, j, sh(b, (r() - .5) * amp)); };
+  const ore = (cols, n) => {
+    for (let k = 0; k < n; k++){
+      const cx = 1 + Math.floor(r() * 13), cy = 1 + Math.floor(r() * 13);
+      px(cx, cy, cols[0]); px(cx + 1, cy, cols[1]); px(cx, cy + 1, cols[1]);
+      if (r() > .4) px(cx + 1, cy + 1, cols[2]);
+      if (r() > .6) px(cx - 1, cy, cols[2]);
+    }
+  };
+  switch (kind){
+    case 'stone': noise([126,126,126], 40); break;
+    case 'deepslate':
+      noise([62,62,68], 24);
+      for (let j = 0; j < 16; j += 3) for (let i = 0; i < 16; i++) if (r() < .5) px(i, j, sh([44,44,50], (r()-.5)*10));
+      break;
+    case 'diamond': noise([124,124,124], 40); ore(['#d6fffb','#5be0d8','#1f9d97'], 5); break;
+    case 'lapis':   noise([124,124,124], 40); ore(['#7d9cf0','#2f55c4','#18388f'], 6); break;
+    case 'gold':
+      noise([238,196,58], 34);
+      for (let i = 0; i < 16; i++){ px(i, 0, '#fff4a3'); px(0, i, '#fff4a3'); px(i, 15, '#a9750e'); px(15, i, '#a9750e'); }
+      for (let k = 0; k < 6; k++){ const i = 2 + Math.floor(r()*11), j = 2 + Math.floor(r()*11); px(i, j, '#fffbd6'); px(i+1, j+1, '#c9921a'); }
+      break;
+    case 'grass': {
+      noise([134,96,67], 34);
+      for (let k = 0; k < 10; k++) px(Math.floor(r()*16), 5 + Math.floor(r()*11), '#5c4030');
+      for (let i = 0; i < 16; i++){
+        const d = 3 + (r() < .5 ? 1 : 0) + (r() < .25 ? 1 : 0);
+        for (let j = 0; j < d; j++) px(i, j, sh([96,162,54], (r() - .5) * 40));
+      }
+      break; }
+    case 'planks':
+      for (let j = 0; j < 16; j++){
+        const p = Math.floor(j / 4), base = [162 + (p%2?8:-6), 128 + (p%2?6:-4), 78];
+        for (let i = 0; i < 16; i++){
+          let col = sh(base, (r() - .5) * 16);
+          if (j % 4 === 3) col = sh([104,78,42], (r()-.5)*8);
+          if (i === (p % 2 ? 4 : 11) && j % 4 !== 3) col = sh([120,92,52], 0);
+          px(i, j, col);
+        }
+      }
+      break;
+    case 'brick':
+      for (let j = 0; j < 16; j++){
+        const g = Math.floor(j / 4), off = g % 2 ? 4 : 0;
+        for (let i = 0; i < 16; i++){
+          const mortar = j % 4 === 3 || (i - off + 16) % 8 === 7;
+          px(i, j, mortar ? sh([178,170,160], (r()-.5)*16) : sh([152,72,56], (r()-.5)*30));
+        }
+      }
+      break;
+    case 'amethyst':
+      noise([136,92,196], 36);
+      for (let k = 0; k < 7; k++){
+        const i = Math.floor(r()*14), j = Math.floor(r()*14);
+        px(i, j, '#e2c6ff'); px(i+1, j+1, '#b48cf0'); px(i+2, j+2, '#5d3a91');
+      }
+      break;
+  }
+  return c;
+}
+const TEX = {}, PAL = {};
+['stone','deepslate','diamond','lapis','gold','grass','planks','brick','amethyst'].forEach((k, n) => {
+  TEX[k] = makeTex(k, 1234 + n * 97);
+  const d = TEX[k].getContext('2d').getImageData(0, 0, 16, 16).data, cols = [];
+  for (let i = 0; i < d.length; i += 4 * 7) cols.push(`rgb(${d[i]},${d[i+1]},${d[i+2]})`);
+  PAL[k] = cols;
+});
+document.body.style.backgroundImage =
+  `linear-gradient(rgba(14,14,18,.80),rgba(10,10,13,.92)),url(${TEX.deepslate.toDataURL()})`;
+document.body.style.backgroundSize = 'auto,64px 64px';
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const well = $('well'), boardCv = $('board'), bctx = boardCv.getContext('2d');
+const holdCv = $('holdCv'), hctx = holdCv.getContext('2d');
+const nextCv = $('nextCv'), nctx = nextCv.getContext('2d');
+const ov = $('ov'), ovTitle = $('ovTitle'), ovText = $('ovText'), ovScore = $('ovScore'), ovBtn = $('ovBtn'), ovBest = $('ovBest');
+const invEl = $('inv');
+const slotEls = {};
+TYPES.forEach(t => {
+  const s = document.createElement('div'); s.className = 'slot empty'; s.title = NAME[t];
+  const img = document.createElement('img'); img.src = TEX[MAT[t]].toDataURL(); img.alt = NAME[t];
+  const n = document.createElement('span'); n.textContent = '0';
+  s.append(img, n); invEl.append(s); slotEls[t] = s;
+});
+
+/* ---------- storage ---------- */
+let best = 0;
+try { best = parseInt(localStorage.getItem('mine-stack-best') || '0', 10) || 0; } catch (e) {}
+function saveBest(){ try { localStorage.setItem('mine-stack-best', String(best)); } catch (e) {} }
+
+/* ---------- audio ---------- */
+let ac = null, soundOn = true;
+try { soundOn = localStorage.getItem('mine-stack-sound') !== 'off'; } catch (e) {}
+function ensureAudio(){
+  if (!ac){ try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+  if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
+}
+function tone(freq, dur, type = 'square', vol = .04, slide = 0, delay = 0){
+  if (!soundOn || !ac) return;
+  const t0 = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+  o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + dur + .02);
+}
+function crunch(vol = .12, dur = .09, freq = 900){
+  if (!soundOn || !ac) return;
+  const n = Math.floor(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = ac.createBufferSource(); s.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = .8;
+  const g = ac.createGain(); g.gain.value = vol;
+  s.connect(f).connect(g).connect(ac.destination); s.start();
+}
+const sfx = {
+  move:   () => tone(200, .03, 'square', .015),
+  rotate: () => tone(380, .05, 'triangle', .035),
+  lock:   () => crunch(.10, .08, 500),
+  clear:  n => { crunch(.16, .16, 1400); [523, 659, 784, 1046].slice(0, n + 1).forEach((f, i) => tone(f, .1, 'square', .03, 0, .05 + i * .07)); },
+  level:  () => [392, 523, 659, 784].forEach((f, i) => tone(f, .12, 'triangle', .04, 0, i * .08)),
+  hold:   () => tone(260, .06, 'triangle', .03, 120),
+  over:   () => { crunch(.18, .3, 300); tone(220, .5, 'sawtooth', .03, -150, .05); },
+};
+function paintSoundBtn(){ $('soundBtn').classList.toggle('off', !soundOn); $('soundBtn').setAttribute('aria-pressed', String(soundOn)); }
+paintSoundBtn();
+
+/* ---------- game state ---------- */
+const S = { board: null, cur: null, hold: null, canHold: true, bag: [], queue: [],
+  score: 0, lines: 0, level: 1, state: 'title', drop: 0, lockT: 0, lockResets: 0,
+  clearing: null, inv: {}, parts: [], levelFlash: 0 };
+
+function emptyBoard(){ return Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+function demoBoard(){
+  const b = emptyBoard(), r = rng(7);
+  for (let y = ROWS - 6; y < ROWS; y++){
+    const hole = Math.floor(r() * COLS);
+    for (let x = 0; x < COLS; x++){
+      if (x === hole) continue;
+      if (y === ROWS - 6 && r() < .55) continue;
+      b[y][x] = TYPES[Math.floor(r() * TYPES.length)];
+    }
+  }
+  return b;
+}
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function nextType(){ if (!S.bag.length) S.bag = shuffle(TYPES.slice()); return S.bag.pop(); }
+function fillQueue(){ while (S.queue.length < 4) S.queue.push(nextType()); }
+function rot(m){ const N = m.length, o = m.map(r => r.slice()); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) o[x][N - 1 - y] = m[y][x]; return o; }
+
+function collide(m, px, py){
+  for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++){
+    if (!m[r][c]) continue;
+    const x = px + c, y = py + r;
+    if (x < 0 || x >= COLS || y >= ROWS) return true;
+    if (y >= 0 && S.board[y][x]) return true;
+  }
+  return false;
+}
+function gravityMs(){ return Math.max(50, 1000 * Math.pow(0.8 - (S.level - 1) * 0.007, S.level - 1)); }
+
+function spawn(type){
+  if (!type){ type = S.queue.shift(); fillQueue(); }
+  const m = SHAPES[type].map(r => r.slice());
+  const x = Math.floor((COLS - m.length) / 2), y = type === 'I' ? -1 : 0;
+  S.cur = { type, m, x, y }; S.drop = 0; S.lockT = 0; S.lockResets = 0;
+  if (collide(m, x, y)) gameOver();
+}
+function onMoved(){
+  if (collide(S.cur.m, S.cur.x, S.cur.y + 1) && S.lockResets < 15){ S.lockT = 0; S.lockResets++; }
+}
+function move(dx){
+  if (!S.cur || collide(S.cur.m, S.cur.x + dx, S.cur.y)) return false;
+  S.cur.x += dx; onMoved(); sfx.move(); return true;
+}
+function rotate(dir){
+  if (!S.cur || S.cur.type === 'O') return;
+  let m = rot(S.cur.m); if (dir < 0){ m = rot(rot(m)); }
+  const kicks = [[0,0],[-1,0],[1,0],[0,-1],[-2,0],[2,0],[0,1]];
+  for (const [kx, ky] of kicks){
+    if (!collide(m, S.cur.x + kx, S.cur.y + ky)){
+      S.cur.m = m; S.cur.x += kx; S.cur.y += ky; onMoved(); sfx.rotate(); return;
+    }
+  }
+}
+function ghostY(){ let y = S.cur.y; while (!collide(S.cur.m, S.cur.x, y + 1)) y++; return y; }
+function hardDrop(){
+  if (!S.cur) return;
+  const gy = ghostY(); S.score += (gy - S.cur.y) * 2; S.cur.y = gy; lock();
+}
+function doHold(){
+  if (!S.cur || !S.canHold) return;
+  const t = S.cur.type;
+  if (S.hold){ const h = S.hold; S.hold = t; spawn(h); } else { S.hold = t; spawn(); }
+  S.canHold = false; sfx.hold();
+}
+function lock(){
+  const { m, x, y, type } = S.cur;
+  for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++){
+    if (!m[r][c]) continue;
+    if (y + r < 0){ S.cur = null; gameOver(); return; }
+    S.board[y + r][x + c] = type;
+  }
+  S.cur = null; S.canHold = true; sfx.lock();
+  const full = [];
+  for (let r = 0; r < ROWS; r++) if (S.board[r].every(Boolean)) full.push(r);
+  if (full.length){
+    S.clearing = { rows: full, t: 0 };
+    for (const r of full) for (let c = 0; c < COLS; c++){
+      const t = S.board[r][c]; S.inv[t] = (S.inv[t] || 0) + 1;
+      if (!reduceMotion) burst(c, r, MAT[t]);
+    }
+    const prevLevel = S.level;
+    S.score += [0, 100, 300, 500, 800][full.length] * S.level;
+    S.lines += full.length;
+    S.level = Math.floor(S.lines / 10) + 1;
+    sfx.clear(full.length);
+    if (S.level > prevLevel){ S.levelFlash = 1200; setTimeout(sfx.level, 260); }
+    renderInv();
+  } else {
+    spawn();
+  }
+}
+function collapse(){
+  const rows = S.clearing.rows.slice().sort((a, b) => b - a);
+  for (const r of rows) S.board.splice(r, 1);
+  for (let i = 0; i < rows.length; i++) S.board.unshift(Array(COLS).fill(null));
+  S.clearing = null; spawn();
+}
+function burst(cx, cy, mat){
+  const pal = PAL[mat];
+  for (let i = 0; i < 5; i++){
+    S.parts.push({ x: cx + .2 + Math.random() * .6, y: cy + .2 + Math.random() * .6,
+      vx: (Math.random() - .5) * 7, vy: -2 - Math.random() * 6,
+      s: .14 + Math.random() * .12, life: .7 + Math.random() * .5,
+      col: pal[Math.floor(Math.random() * pal.length)] });
+  }
+}
+
+/* ---------- flow ---------- */
+function showOverlay(kind){
+  ov.hidden = false; ovScore.hidden = true;
+  ovTitle.classList.toggle('lose', kind === 'over');
+  if (kind === 'title'){
+    ovTitle.textContent = '礦坑方塊';
+    ovText.innerHTML = '每種方塊都是一種礦物。<br>消除一行就往下挖一格。';
+    ovBtn.textContent = '開始挖礦';
+  } else if (kind === 'pause'){
+    ovTitle.textContent = '暫停中';
+    ovText.textContent = `目前深度 Y ${64 - S.lines}，分數 ${S.score.toLocaleString()}`;
+    ovBtn.textContent = '繼續挖';
+  } else {
+    ovTitle.textContent = '礦坑塌了！';
+    ovText.textContent = `挖到 Y ${64 - S.lines}，消除 ${S.lines} 行`;
+    ovScore.hidden = false; ovScore.textContent = S.score.toLocaleString() + ' 分';
+    ovBtn.textContent = '再挖一次';
+  }
+  ovBest.textContent = best ? `最高紀錄 ${best.toLocaleString()} 分` : '';
+  ovBtn.focus({ preventScroll: true });
+}
+function newGame(){
+  S.board = emptyBoard(); S.bag = []; S.queue = []; fillQueue();
+  S.hold = null; S.canHold = true; S.score = 0; S.lines = 0; S.level = 1;
+  S.inv = {}; S.parts = []; S.clearing = null; S.levelFlash = 0;
+  releaseAll(); renderInv(); spawn();
+  S.state = 'play'; ov.hidden = true;
+}
+function gameOver(){
+  S.state = 'over'; releaseAll();
+  if (S.score > best){ best = S.score; saveBest(); }
+  sfx.over(); showOverlay('over');
+}
+function togglePause(){
+  if (S.state === 'play'){ S.state = 'paused'; releaseAll(); showOverlay('pause'); }
+  else if (S.state === 'paused'){ S.state = 'play'; ov.hidden = true; }
+}
+ovBtn.addEventListener('click', () => {
+  ensureAudio();
+  if (S.state === 'paused') togglePause(); else newGame();
+  ovBtn.blur();
+});
+$('pauseBtn').addEventListener('click', e => { ensureAudio(); togglePause(); e.currentTarget.blur(); });
+$('soundBtn').addEventListener('click', e => {
+  soundOn = !soundOn; ensureAudio(); paintSoundBtn();
+  try { localStorage.setItem('mine-stack-sound', soundOn ? 'on' : 'off'); } catch (err) {}
+  e.currentTarget.blur();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden && S.state === 'play') togglePause(); });
+
+/* ---------- input ---------- */
+const DAS = 160, ARR = 45;
+const held = { left: false, right: false, down: false };
+const tmr = { left: 0, right: 0 }, acc = { left: 0, right: 0 };
+function press(d){
+  if (S.state !== 'play') return;
+  held[d] = true;
+  if (d === 'left' || d === 'right'){
+    held[d === 'left' ? 'right' : 'left'] = false;
+    tmr[d] = 0; acc[d] = 0;
+    if (!S.clearing) move(d === 'left' ? -1 : 1);
+  }
+}
+function release(d){ held[d] = false; }
+function releaseAll(){ held.left = held.right = held.down = false; }
+function handleHeld(dt){
+  for (const d of ['left', 'right']){
+    if (!held[d]) continue;
+    tmr[d] += dt;
+    if (tmr[d] >= DAS){
+      acc[d] += dt;
+      while (acc[d] >= ARR){ acc[d] -= ARR; if (!move(d === 'left' ? -1 : 1)) { acc[d] = 0; break; } }
+    }
+  }
+}
+function action(a){
+  if (S.state !== 'play' || S.clearing) return;
+  if (a === 'rotate') rotate(1);
+  else if (a === 'ccw') rotate(-1);
+  else if (a === 'drop') hardDrop();
+  else if (a === 'hold') doHold();
+}
+
+addEventListener('keydown', e => {
+  const k = e.key;
+  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
+  ensureAudio();
+  if (S.state === 'title' || S.state === 'over'){ if (k === 'Enter' || k === ' ') newGame(); return; }
+  if (k === 'p' || k === 'P' || k === 'Escape'){ togglePause(); return; }
+  if (S.state === 'paused'){ if (k === 'Enter' || k === ' ') togglePause(); return; }
+  if (e.repeat) return;
+  switch (k){
+    case 'ArrowLeft': press('left'); break;
+    case 'ArrowRight': press('right'); break;
+    case 'ArrowDown': press('down'); break;
+    case 'ArrowUp': case 'x': case 'X': action('rotate'); break;
+    case 'z': case 'Z': action('ccw'); break;
+    case ' ': action('drop'); break;
+    case 'c': case 'C': case 'Shift': action('hold'); break;
+  }
+});
+addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft') release('left');
+  else if (e.key === 'ArrowRight') release('right');
+  else if (e.key === 'ArrowDown') release('down');
+});
+addEventListener('blur', releaseAll);
+
+const pad = $('pad');
+pad.addEventListener('contextmenu', e => e.preventDefault());
+pad.addEventListener('pointerdown', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  e.preventDefault(); ensureAudio();
+  try { b.setPointerCapture(e.pointerId); } catch (err) {}
+  b.classList.add('on');
+  const a = b.dataset.act;
+  if (a === 'left' || a === 'right' || a === 'down') press(a); else action(a);
+});
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => pad.addEventListener(ev, e => {
+  const b = e.target.closest('button'); if (!b) return;
+  b.classList.remove('on');
+  const a = b.dataset.act;
+  if (a === 'left' || a === 'right' || a === 'down') release(a);
+}));
+boardCv.addEventListener('pointerdown', e => { if (S.state === 'play'){ e.preventDefault(); ensureAudio(); action('rotate'); } });
+
+/* ---------- drawing ---------- */
+let cs = 24, dpr = 1;
+function drawCell(ctx, mat, x, y, s, alpha = 1){
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(TEX[mat], x, y, s, s);
+  const b = Math.max(1, Math.round(s / 14));
+  ctx.fillStyle = 'rgba(255,255,255,.20)'; ctx.fillRect(x, y, s, b); ctx.fillRect(x, y, b, s);
+  ctx.fillStyle = 'rgba(0,0,0,.38)'; ctx.fillRect(x, y + s - b, s, b); ctx.fillRect(x + s - b, y, b, s);
+  ctx.globalAlpha = 1;
+}
+function drawMini(ctx, type, cx, cy, s, alpha = 1){
+  const m = SHAPES[type]; let x0 = 9, x1 = -1, y0 = 9, y1 = -1;
+  m.forEach((row, r) => row.forEach((v, c) => { if (v){ x0 = Math.min(x0, c); x1 = Math.max(x1, c); y0 = Math.min(y0, r); y1 = Math.max(y1, r); } }));
+  const ox = Math.round(cx - (x1 - x0 + 1) * s / 2), oy = Math.round(cy - (y1 - y0 + 1) * s / 2);
+  m.forEach((row, r) => row.forEach((v, c) => { if (v) drawCell(ctx, MAT[type], ox + (c - x0) * s, oy + (r - y0) * s, s, alpha); }));
+}
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const w = well.clientWidth - 18, h = well.clientHeight - 18;
+  cs = Math.max(10, Math.floor(Math.min(w / COLS, h / ROWS)));
+  boardCv.style.width = cs * COLS + 'px'; boardCv.style.height = cs * ROWS + 'px';
+  boardCv.width = cs * COLS * dpr; boardCv.height = cs * ROWS * dpr;
+  for (const [cv, ratio] of [[holdCv, .62], [nextCv, 1.55]]){
+    const cw = cv.clientWidth || 80;
+    cv.style.height = Math.round(cw * ratio) + 'px';
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(cw * ratio * dpr);
+  }
+}
+function prep(ctx){ ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false; }
+
+function drawBoard(){
+  const ctx = bctx; prep(ctx);
+  const W = cs * COLS, H = cs * ROWS;
+  ctx.fillStyle = '#0c0d10'; ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = .26;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) ctx.drawImage(TEX.deepslate, x * cs, y * cs, cs, cs);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  for (let x = 1; x < COLS; x++) ctx.fillRect(x * cs, 0, 1, H);
+  for (let y = 1; y < ROWS; y++) ctx.fillRect(0, y * cs, W, 1);
+
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++){
+    const t = S.board[y][x]; if (t) drawCell(ctx, MAT[t], x * cs, y * cs, cs);
+  }
+  if (S.clearing){
+    const k = S.clearing.t / 320;
+    for (const r of S.clearing.rows){
+      ctx.fillStyle = `rgba(255,255,255,${reduceMotion ? .4 : (.75 * (1 - k)) * (Math.floor(S.clearing.t / 60) % 2 ? 1 : .5)})`;
+      ctx.fillRect(0, r * cs, W, cs);
+      // crack lines while breaking
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      const stage = Math.min(4, Math.floor(k * 5));
+      for (let x = 0; x < COLS; x++) for (let i = 0; i < stage; i++){
+        const px = x * cs + ((i * 5 + x * 3) % 12 + 2) * cs / 16, py = r * cs + ((i * 7 + x) % 12 + 2) * cs / 16;
+        ctx.fillRect(px, py, Math.max(1, cs / 8), Math.max(1, cs / 16));
+      }
+    }
+  }
+  if (S.cur && S.state !== 'over'){
+    const gy = ghostY(), m = S.cur.m, mat = MAT[S.cur.type];
+    for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++){
+      if (!m[r][c] || gy + r < 0) continue;
+      const x = (S.cur.x + c) * cs, y = (gy + r) * cs;
+      drawCell(ctx, mat, x, y, cs, .22);
+      ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1;
+      ctx.strokeRect(x + .5, y + .5, cs - 1, cs - 1);
+    }
+    for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++){
+      if (!m[r][c] || S.cur.y + r < 0) continue;
+      drawCell(ctx, mat, (S.cur.x + c) * cs, (S.cur.y + r) * cs, cs);
+    }
+  }
+  for (const p of S.parts){
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
+    ctx.fillStyle = p.col;
+    const s = Math.max(2, p.s * cs);
+    ctx.fillRect(p.x * cs - s / 2, p.y * cs - s / 2, s, s);
+  }
+  ctx.globalAlpha = 1;
+  if (S.levelFlash > 0){
+    const a = Math.min(1, S.levelFlash / 400);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(0, H / 2 - cs * 1.2, W, cs * 2.4);
+    ctx.fillStyle = '#46d47d';
+    ctx.font = `${Math.round(cs * .95)}px ${getComputedStyle(document.documentElement).getPropertyValue('--font')}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`等級 ${S.level}`, W / 2, H / 2);
+    ctx.globalAlpha = 1;
+  }
+}
+function drawSide(){
+  prep(hctx);
+  const hw = holdCv.width / dpr, hh = holdCv.height / dpr;
+  hctx.clearRect(0, 0, hw, hh);
+  if (S.hold) drawMini(hctx, S.hold, hw / 2, hh / 2, Math.floor(Math.min(hw / 5, hh / 2.6)), S.canHold ? 1 : .35);
+  prep(nctx);
+  const nw = nextCv.width / dpr, nh = nextCv.height / dpr;
+  nctx.clearRect(0, 0, nw, nh);
+  const slotH = nh / 3, s = Math.floor(Math.min(nw / 5, slotH / 2.6));
+  S.queue.slice(0, 3).forEach((t, i) => drawMini(nctx, t, nw / 2, slotH * i + slotH / 2, i === 0 ? s : Math.floor(s * .8), i === 0 ? 1 : .8));
+}
+let lastStats = '';
+function renderStats(){
+  const key = `${S.score}|${S.level}|${S.lines}`;
+  if (key === lastStats) return; lastStats = key;
+  $('sScore').textContent = S.score.toLocaleString();
+  $('sLevel').textContent = S.level;
+  $('sLines').textContent = S.lines;
+  $('sDepth').textContent = 'Y ' + Math.max(-64, 64 - S.lines);
+}
+function renderInv(){
+  TYPES.forEach(t => {
+    const n = S.inv[t] || 0, el = slotEls[t];
+    el.classList.toggle('empty', !n); el.querySelector('span').textContent = n;
+  });
+}
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function update(dt){
+  for (const p of S.parts){ p.vy += 22 * dt / 1000; p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000; p.life -= dt / 1000; }
+  S.parts = S.parts.filter(p => p.life > 0 && p.y < ROWS + 2);
+  if (S.levelFlash > 0) S.levelFlash -= dt;
+  if (S.state !== 'play') return;
+  if (S.clearing){ S.clearing.t += dt; if (S.clearing.t >= 320) collapse(); return; }
+  if (!S.cur) return;
+  handleHeld(dt);
+  if (!S.cur) return;
+  const g = held.down ? Math.min(40, gravityMs()) : gravityMs();
+  if (collide(S.cur.m, S.cur.x, S.cur.y + 1)){
+    S.drop = 0; S.lockT += dt;
+    if (S.lockT >= 500) lock();
+  } else {
+    S.lockT = 0; S.drop += dt;
+    while (S.drop >= g){
+      S.drop -= g;
+      if (collide(S.cur.m, S.cur.x, S.cur.y + 1)) break;
+      S.cur.y++; if (held.down) S.score += 1;
+    }
+  }
+}
+function frame(now){
+  const dt = Math.min(50, now - last); last = now;
+  update(dt);
+  drawBoard(); drawSide(); renderStats();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- boot ---------- */
+S.board = demoBoard(); fillQueue();
+renderInv(); showOverlay('title');
+resize();
+new ResizeObserver(resize).observe(well);
+addEventListener('resize', resize);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
