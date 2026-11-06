@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
 <style>
-/* Layout: one-screen cave — the well (board) fills the middle, a stone inventory column on the right, a row of stone buttons below on touch screens. */
+/* Layout: one-screen cave — the well (board) fills the middle, a stone inventory column on the right, a row of stone buttons below on touch screens. Menus float over the whole screen. */
 :root{
   --cave:#121317;
   --panel:#2a2b30;
@@ -26,6 +26,7 @@
   --font:"DotGothic16","PingFang TC","Noto Sans TC","Microsoft JhengHei",monospace;
   color-scheme:dark;
 }
+[hidden]{display:none!important}
 html,body{height:100%}
 body{
   background-color:var(--cave);
@@ -64,9 +65,13 @@ header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-lef
 .mc-btn:hover{background:var(--btn-hover)}
 .mc-btn:active,.mc-btn.on{border-color:var(--lo) var(--hi) var(--hi) var(--lo);background:#4b4d54}
 .mc-btn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.mc-btn:disabled{cursor:not-allowed;opacity:.45}
+.mc-btn:disabled:hover{background:var(--btn)}
 .mc-btn.icon{width:40px;height:40px;padding:0;display:grid;place-items:center}
 .mc-btn svg{width:18px;height:18px;fill:currentColor;display:block}
 .mc-btn.off{color:var(--muted)}
+.mc-btn.primary{background:#3f7a3a;border-color:#6fae5f #1f3d1c #1f3d1c #6fae5f}
+.mc-btn.primary:hover{background:#4a8a44}
 
 .stage{flex:1 1 0;min-height:0;display:flex;gap:10px}
 .well{flex:1 1 0;min-width:0;min-height:0;position:relative}
@@ -75,23 +80,44 @@ header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-lef
   box-shadow:0 0 0 3px var(--lo),0 0 0 6px var(--hi),0 0 0 9px var(--lo);
 }
 #board{display:block;touch-action:none}
+
 .overlay{
-  position:absolute;inset:0;display:grid;place-items:center;
-  background:rgba(8,8,10,.62);
+  position:fixed;inset:0;z-index:20;
+  display:grid;place-items:center;
+  background:rgba(8,8,10,.74);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px));
+  box-sizing:border-box;
 }
 .card{
-  width:calc(100% - 24px);max-width:260px;box-sizing:border-box;
+  width:100%;max-width:460px;max-height:100%;overflow-y:auto;box-sizing:border-box;
   background:var(--panel);
   border:3px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);
   box-shadow:0 0 0 2px #000;
   padding:16px 14px;text-align:center;
-  display:flex;flex-direction:column;gap:10px;align-items:center;
+  display:flex;flex-direction:column;gap:12px;align-items:center;
 }
-.card h2{margin:0;font-weight:400;font-size:24px;text-shadow:2px 2px 0 var(--lo);text-wrap:balance}
+.card h2{margin:0;font-weight:400;font-size:26px;text-shadow:2px 2px 0 var(--lo);text-wrap:balance}
 .card h2.lose{color:var(--danger)}
-.card p{margin:0;font-size:13px;line-height:1.6;color:var(--muted)}
+.card h2.win{color:var(--emerald)}
+.card p{margin:0;font-size:14px;line-height:1.6;color:var(--muted);max-width:34em}
 .card .big{font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums}
-.card .mc-btn{font-size:17px;padding:8px 18px}
+.card .row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.card .row .mc-btn{font-size:17px;padding:8px 16px}
+.stars{font-size:30px;letter-spacing:4px;color:var(--gold);text-shadow:2px 2px 0 var(--lo)}
+.stars i{font-style:normal;color:#4a4b50}
+
+.stages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+.stage-btn{
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  text-align:left;padding:8px 10px;min-width:0;
+}
+.stage-btn .n{font-size:12px;color:var(--muted);text-shadow:none}
+.stage-btn .t{font-size:16px}
+.stage-btn .s{font-size:14px;letter-spacing:2px;color:var(--gold)}
+.stage-btn .s i{font-style:normal;color:#3d3e43}
+.stage-btn.endless{grid-column:1/-1;align-items:center;text-align:center}
 
 .side{
   width:clamp(98px,27vw,184px);flex:none;
@@ -104,14 +130,19 @@ header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-lef
   box-shadow:0 0 0 2px #000;
   padding:6px;
 }
-.box h3{margin:0 0 4px;font-weight:400;font-size:12px;letter-spacing:.12em;color:var(--muted)}
+.box h3{margin:0 0 4px;font-weight:400;font-size:12px;letter-spacing:.08em;color:var(--muted)}
 .box canvas{display:block;width:100%;background:var(--slot);
   box-shadow:inset 2px 2px 0 var(--lo),inset -2px -2px 0 var(--hi)}
+.goal-name{font-size:14px;color:var(--text);margin-bottom:4px;line-height:1.3}
+.goal-text{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.4}
+.bar{height:8px;margin-top:4px;background:var(--slot);
+  box-shadow:inset 1px 1px 0 var(--lo),inset -1px -1px 0 var(--hi)}
+.bar > div{height:100%;width:0;background:var(--emerald);box-shadow:inset 0 -2px 0 rgba(0,0,0,.3)}
+.goal-rise{font-size:12px;color:var(--danger);margin-top:4px;font-variant-numeric:tabular-nums}
 .stats{display:grid;gap:4px}
 .stat{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:12px;color:var(--muted)}
 .stat b{font-weight:400;font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
 .stat.score b{color:var(--gold)}
-.stat.depth b{color:var(--emerald)}
 .inv{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:4px}
 .slot{
   position:relative;aspect-ratio:1;max-width:100%;
@@ -134,7 +165,7 @@ header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-lef
 .pad .mc-btn{height:62px;padding:0;display:grid;place-items:center;font-size:15px}
 .pad .mc-btn svg{width:24px;height:24px}
 .pad .gap{margin-left:6px}
-.keys{display:none;font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+.keys{display:none;font-size:12px;color:var(--muted);text-align:center;line-height:1.7;margin:0}
 .keys kbd{font-family:var(--font);color:var(--text);background:var(--slot);padding:0 5px;
   box-shadow:inset -1px -1px 0 var(--lo),inset 1px 1px 0 var(--hi)}
 @media (hover:hover) and (pointer:fine){
@@ -144,9 +175,10 @@ header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-lef
 @media (max-width:360px){
   .pad .mc-btn{height:54px}
   header h1 small{display:none}
+  .stages{grid-template-columns:minmax(0,1fr)}
 }
 </style>
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font-size:14px}[hidden]{display:none!important}</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font-size:14px}</style>
 </head>
 <body>
 
@@ -163,28 +195,24 @@ header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-lef
 
   <section class="stage">
     <div class="well" id="well">
-      <div class="frame" id="frame">
-        <canvas id="board" aria-label="遊戲盤面"></canvas>
-        <div class="overlay" id="ov">
-          <div class="card">
-            <h2 id="ovTitle">礦坑方塊</h2>
-            <p id="ovText">每種方塊都是一種礦物。<br>消除一行就往下挖一格。</p>
-            <div class="big" id="ovScore" hidden></div>
-            <button class="mc-btn" id="ovBtn" type="button">開始挖礦</button>
-            <p id="ovBest"></p>
-          </div>
-        </div>
-      </div>
+      <div class="frame"><canvas id="board" aria-label="遊戲盤面"></canvas></div>
     </div>
 
     <aside class="side">
+      <div class="box">
+        <h3 id="goalHead">目標</h3>
+        <div class="goal-name" id="goalName">—</div>
+        <div class="goal-text" id="goalText"></div>
+        <div class="bar" id="goalBar"><div id="goalFill"></div></div>
+        <div class="goal-rise" id="goalRise" hidden></div>
+      </div>
       <div class="box"><h3>暫存</h3><canvas id="holdCv"></canvas></div>
       <div class="box"><h3>下一個</h3><canvas id="nextCv"></canvas></div>
       <div class="box stats">
         <div class="stat score">分數<b id="sScore">0</b></div>
         <div class="stat">等級<b id="sLevel">1</b></div>
         <div class="stat">行數<b id="sLines">0</b></div>
-        <div class="stat depth">深度<b id="sDepth">Y 64</b></div>
+        <div class="stat">時間<b id="sTime">0:00</b></div>
       </div>
       <div class="box"><h3>背包</h3><div class="inv" id="inv"></div></div>
     </aside>
@@ -205,6 +233,8 @@ header h1 small{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-lef
   </p>
 </main>
 
+<div class="overlay" id="ov"><div class="card" id="card"></div></div>
+
 <script>
 (() => {
 'use strict';
@@ -219,8 +249,38 @@ const SHAPES = {
   L: [[0,0,1],[1,1,1],[0,0,0]],
 };
 const TYPES = Object.keys(SHAPES);
-const MAT = { I:'diamond', O:'gold', T:'amethyst', S:'grass', Z:'brick', J:'lapis', L:'planks' };
-const NAME = { I:'鑽石礦', O:'金磚', T:'紫水晶', S:'草方塊', Z:'紅磚', J:'青金石礦', L:'橡木材' };
+/* cell code -> material. Letters I..L are falling pieces; G K R X M are pre-placed blocks. */
+const MAT = { I:'diamond', O:'gold', T:'amethyst', S:'grass', Z:'brick', J:'lapis', L:'planks',
+  G:'stone', K:'deepslate', R:'diamond', X:'tnt', M:'magma' };
+const GARBAGE = new Set(['G','K','R','X','M']);
+const MAT_NAME = { diamond:'鑽石', gold:'金磚', amethyst:'紫水晶', grass:'草方塊', brick:'紅磚',
+  lapis:'青金石', planks:'橡木材', stone:'石頭', deepslate:'深板岩', tnt:'炸藥', magma:'岩漿塊' };
+const INV_ORDER = ['diamond','gold','amethyst','grass','brick','lapis','planks','stone','deepslate','tnt','magma'];
+const INV_ALWAYS = new Set(['diamond','gold','amethyst','grass','brick','lapis','planks']);
+
+const STAGES = [
+  { name:'草原地表', bg:'dirt', desc:'熟悉操作，消除 8 行。',
+    goal:{ type:'lines', n:8 }, start:1, par:90 },
+  { name:'淺層洞穴', bg:'stone', desc:'底部有 5 層石頭，把石頭全部挖掉。',
+    goal:{ type:'garbage' }, garbage:{ rows:5, mat:'G' }, start:2, par:100 },
+  { name:'鑽石礦脈', bg:'stone', desc:'石層裡藏著鑽石礦，收集 16 顆鑽石。長條方塊也算鑽石。',
+    goal:{ type:'collect', mat:'diamond', n:16 }, garbage:{ rows:6, mat:'G', ore:'R', rate:.22 }, start:2, par:120 },
+  { name:'地下河', bg:'stone', desc:'水流湍急，速度從等級 5 開始，消除 15 行。',
+    goal:{ type:'lines', n:15 }, start:5, par:130 },
+  { name:'黑暗洞窟', bg:'deepslate', desc:'只有火把照得到的地方看得見，消除 10 行。',
+    goal:{ type:'lines', n:10 }, dark:true, start:3, par:120 },
+  { name:'炸藥坑', bg:'stone', desc:'消除含炸藥的一行時，下面那行會一起炸掉。清光全部石頭。',
+    goal:{ type:'garbage' }, garbage:{ rows:9, mat:'G', ore:'X', rate:.12 }, start:3, par:120 },
+  { name:'熔岩上升', bg:'netherrack', desc:'每 10 秒底部冒出一層岩漿塊，消除 15 行。',
+    goal:{ type:'lines', n:15 }, rise:10000, riseMat:'M', start:3, par:150 },
+  { name:'深板岩層', bg:'deepslate', desc:'等級 7 起跳，底部 4 層深板岩，消除 20 行。',
+    goal:{ type:'lines', n:20 }, garbage:{ rows:4, mat:'K' }, start:7, par:170 },
+  { name:'地獄熔爐', bg:'netherrack', desc:'黑暗又有岩漿，每 9 秒上升一層，消除 15 行。',
+    goal:{ type:'lines', n:15 }, dark:true, rise:9000, riseMat:'M', start:4, par:170 },
+  { name:'世界底部', bg:'bedrock', desc:'最後一關：等級 8 起跳，每 12 秒上升一層，消除 30 行。',
+    goal:{ type:'lines', n:30 }, garbage:{ rows:3, mat:'K' }, rise:12000, riseMat:'K', start:8, par:240 },
+];
+const ENDLESS = { name:'無盡模式', bg:'stone', desc:'沒有終點，挖得越深越好。', goal:null, start:1, endless:true };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- pixel textures (16x16, generated) ---------- */
@@ -235,8 +295,7 @@ function makeTex(kind, seed){
   const x = c.getContext('2d'); const r = rng(seed);
   const px = (i, j, col) => { x.fillStyle = col; x.fillRect(i, j, 1, 1); };
   const sh = (b, v) => `rgb(${clamp(b[0]+v)},${clamp(b[1]+v)},${clamp(b[2]+v)})`;
-  const noise = (b, amp, rows) => { for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++)
-    if (!rows || rows(i, j)) px(i, j, sh(b, (r() - .5) * amp)); };
+  const noise = (b, amp) => { for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) px(i, j, sh(b, (r() - .5) * amp)); };
   const ore = (cols, n) => {
     for (let k = 0; k < n; k++){
       const cx = 1 + Math.floor(r() * 13), cy = 1 + Math.floor(r() * 13);
@@ -250,6 +309,19 @@ function makeTex(kind, seed){
     case 'deepslate':
       noise([62,62,68], 24);
       for (let j = 0; j < 16; j += 3) for (let i = 0; i < 16; i++) if (r() < .5) px(i, j, sh([44,44,50], (r()-.5)*10));
+      break;
+    case 'dirt':
+      noise([122,86,58], 36);
+      for (let k = 0; k < 14; k++) px(Math.floor(r()*16), Math.floor(r()*16), '#5a3f2b');
+      break;
+    case 'netherrack':
+      noise([110,38,38], 40);
+      for (let k = 0; k < 18; k++) px(Math.floor(r()*16), Math.floor(r()*16), '#5e1a1c');
+      break;
+    case 'bedrock':
+      for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++){
+        const v = r(); px(i, j, v < .33 ? '#2a2a2a' : v < .66 ? '#575757' : '#8a8a8a');
+      }
       break;
     case 'diamond': noise([124,124,124], 40); ore(['#d6fffb','#5be0d8','#1f9d97'], 5); break;
     case 'lapis':   noise([124,124,124], 40); ore(['#7d9cf0','#2f55c4','#18388f'], 6); break;
@@ -293,18 +365,34 @@ function makeTex(kind, seed){
         px(i, j, '#e2c6ff'); px(i+1, j+1, '#b48cf0'); px(i+2, j+2, '#5d3a91');
       }
       break;
+    case 'tnt':
+      for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++){
+        let col = sh([196,52,40], (r()-.5)*24);
+        if (i % 4 === 0) col = sh([140,30,26], (r()-.5)*10);
+        if (j >= 6 && j <= 9) col = sh([226,222,210], (r()-.5)*14);
+        px(i, j, col);
+      }
+      [[3,7],[4,7],[5,7],[4,8],[7,7],[7,8],[8,7],[9,8],[9,7],[11,7],[12,7],[13,7],[12,8]].forEach(([i,j]) => px(i, j, '#2b2b2b'));
+      for (let i = 6; i < 10; i++) px(i, 0, '#3a2a1a');
+      break;
+    case 'magma':
+      noise([92,28,16], 30);
+      for (let k = 0; k < 9; k++){
+        let i = Math.floor(r()*16), j = Math.floor(r()*16);
+        for (let s = 0; s < 4; s++){ px(i, j, s % 2 ? '#ffb02e' : '#ff6a1a'); i = (i + (r() < .5 ? 1 : 15)) % 16; j = (j + 1) % 16; }
+      }
+      break;
   }
   return c;
 }
-const TEX = {}, PAL = {};
-['stone','deepslate','diamond','lapis','gold','grass','planks','brick','amethyst'].forEach((k, n) => {
+const TEX = {}, PAL = {}, ICON = {};
+['stone','deepslate','dirt','netherrack','bedrock','diamond','lapis','gold','grass','planks','brick','amethyst','tnt','magma'].forEach((k, n) => {
   TEX[k] = makeTex(k, 1234 + n * 97);
   const d = TEX[k].getContext('2d').getImageData(0, 0, 16, 16).data, cols = [];
   for (let i = 0; i < d.length; i += 4 * 7) cols.push(`rgb(${d[i]},${d[i+1]},${d[i+2]})`);
-  PAL[k] = cols;
+  PAL[k] = cols; ICON[k] = TEX[k].toDataURL();
 });
-document.body.style.backgroundImage =
-  `linear-gradient(rgba(14,14,18,.80),rgba(10,10,13,.92)),url(${TEX.deepslate.toDataURL()})`;
+document.body.style.backgroundImage = `linear-gradient(rgba(14,14,18,.80),rgba(10,10,13,.92)),url(${ICON.deepslate})`;
 document.body.style.backgroundSize = 'auto,64px 64px';
 
 /* ---------- DOM ---------- */
@@ -312,24 +400,26 @@ const $ = id => document.getElementById(id);
 const well = $('well'), boardCv = $('board'), bctx = boardCv.getContext('2d');
 const holdCv = $('holdCv'), hctx = holdCv.getContext('2d');
 const nextCv = $('nextCv'), nctx = nextCv.getContext('2d');
-const ov = $('ov'), ovTitle = $('ovTitle'), ovText = $('ovText'), ovScore = $('ovScore'), ovBtn = $('ovBtn'), ovBest = $('ovBest');
-const invEl = $('inv');
+const ov = $('ov'), card = $('card');
 const slotEls = {};
-TYPES.forEach(t => {
-  const s = document.createElement('div'); s.className = 'slot empty'; s.title = NAME[t];
-  const img = document.createElement('img'); img.src = TEX[MAT[t]].toDataURL(); img.alt = NAME[t];
+INV_ORDER.forEach(m => {
+  const s = document.createElement('div'); s.className = 'slot empty'; s.title = MAT_NAME[m];
+  const img = document.createElement('img'); img.src = ICON[m]; img.alt = MAT_NAME[m];
   const n = document.createElement('span'); n.textContent = '0';
-  s.append(img, n); invEl.append(s); slotEls[t] = s;
+  s.append(img, n); $('inv').append(s); slotEls[m] = s;
+  s.hidden = !INV_ALWAYS.has(m);
 });
 
-/* ---------- storage ---------- */
-let best = 0;
-try { best = parseInt(localStorage.getItem('mine-stack-best') || '0', 10) || 0; } catch (e) {}
-function saveBest(){ try { localStorage.setItem('mine-stack-best', String(best)); } catch (e) {} }
+/* ---------- storage (per-viewer, optional) ---------- */
+function load(key, fallback){ try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch (e) { return fallback; } }
+function save(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+let best = load('mine-stack-best', 0) || 0;
+let progress = load('mine-stack-progress', {}) || {};
+let soundOn = load('mine-stack-sound2', true) !== false;
+const unlockedUpTo = () => { let u = 0; while (u < STAGES.length - 1 && progress[u + 1]) u++; return u; }; // index of highest playable stage
 
 /* ---------- audio ---------- */
-let ac = null, soundOn = true;
-try { soundOn = localStorage.getItem('mine-stack-sound') !== 'off'; } catch (e) {}
+let ac = null;
 function ensureAudio(){
   if (!ac){ try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
   if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
@@ -355,8 +445,11 @@ const sfx = {
   move:   () => tone(200, .03, 'square', .015),
   rotate: () => tone(380, .05, 'triangle', .035),
   lock:   () => crunch(.10, .08, 500),
-  clear:  n => { crunch(.16, .16, 1400); [523, 659, 784, 1046].slice(0, n + 1).forEach((f, i) => tone(f, .1, 'square', .03, 0, .05 + i * .07)); },
+  clear:  n => { crunch(.16, .16, 1400); [523, 659, 784, 1046].slice(0, Math.min(4, n) + 1).forEach((f, i) => tone(f, .1, 'square', .03, 0, .05 + i * .07)); },
+  boom:   () => { crunch(.3, .35, 180); tone(90, .3, 'sawtooth', .04, -40); },
+  rise:   () => { crunch(.08, .2, 220); tone(110, .2, 'triangle', .03, -30); },
   level:  () => [392, 523, 659, 784].forEach((f, i) => tone(f, .12, 'triangle', .04, 0, i * .08)),
+  win:    () => [523, 659, 784, 659, 784, 1046].forEach((f, i) => tone(f, .16, 'square', .035, 0, i * .11)),
   hold:   () => tone(260, .06, 'triangle', .03, 120),
   over:   () => { crunch(.18, .3, 300); tone(220, .5, 'sawtooth', .03, -150, .05); },
 };
@@ -365,22 +458,29 @@ paintSoundBtn();
 
 /* ---------- game state ---------- */
 const S = { board: null, cur: null, hold: null, canHold: true, bag: [], queue: [],
-  score: 0, lines: 0, level: 1, state: 'title', drop: 0, lockT: 0, lockResets: 0,
-  clearing: null, inv: {}, parts: [], levelFlash: 0 };
+  score: 0, lines: 0, level: 1, state: 'menu', drop: 0, lockT: 0, lockResets: 0,
+  clearing: null, inv: {}, parts: [], levelFlash: 0, flashText: '',
+  stage: ENDLESS, stageIdx: -1, time: 0, riseT: 0, garbage0: 0, torch: { x: 5, y: 2 } };
 
 function emptyBoard(){ return Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+function garbageRow(mat, ore, rate, r = Math.random){
+  const row = Array(COLS).fill(mat), hole = Math.floor(r() * COLS);
+  row[hole] = null;
+  if (ore) for (let x = 0; x < COLS; x++) if (row[x] && r() < rate) row[x] = ore;
+  return row;
+}
 function demoBoard(){
   const b = emptyBoard(), r = rng(7);
   for (let y = ROWS - 6; y < ROWS; y++){
     const hole = Math.floor(r() * COLS);
     for (let x = 0; x < COLS; x++){
-      if (x === hole) continue;
-      if (y === ROWS - 6 && r() < .55) continue;
+      if (x === hole || (y === ROWS - 6 && r() < .55)) continue;
       b[y][x] = TYPES[Math.floor(r() * TYPES.length)];
     }
   }
   return b;
 }
+function countGarbage(){ let n = 0; for (const row of S.board) for (const c of row) if (c && GARBAGE.has(c)) n++; return n; }
 function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function nextType(){ if (!S.bag.length) S.bag = shuffle(TYPES.slice()); return S.bag.pop(); }
 function fillQueue(){ while (S.queue.length < 4) S.queue.push(nextType()); }
@@ -395,7 +495,7 @@ function collide(m, px, py){
   }
   return false;
 }
-function gravityMs(){ return Math.max(50, 1000 * Math.pow(0.8 - (S.level - 1) * 0.007, S.level - 1)); }
+function gravityMs(){ const l = Math.min(S.level, 20); return Math.max(50, 1000 * Math.pow(0.8 - (l - 1) * 0.007, l - 1)); }
 
 function spawn(type){
   if (!type){ type = S.queue.shift(); fillQueue(); }
@@ -413,7 +513,7 @@ function move(dx){
 }
 function rotate(dir){
   if (!S.cur || S.cur.type === 'O') return;
-  let m = rot(S.cur.m); if (dir < 0){ m = rot(rot(m)); }
+  let m = rot(S.cur.m); if (dir < 0) m = rot(rot(m));
   const kicks = [[0,0],[-1,0],[1,0],[0,-1],[-2,0],[2,0],[0,1]];
   for (const [kx, ky] of kicks){
     if (!collide(m, S.cur.x + kx, S.cur.y + ky)){
@@ -440,20 +540,33 @@ function lock(){
     S.board[y + r][x + c] = type;
   }
   S.cur = null; S.canHold = true; sfx.lock();
-  const full = [];
-  for (let r = 0; r < ROWS; r++) if (S.board[r].every(Boolean)) full.push(r);
-  if (full.length){
-    S.clearing = { rows: full, t: 0 };
-    for (const r of full) for (let c = 0; c < COLS; c++){
-      const t = S.board[r][c]; S.inv[t] = (S.inv[t] || 0) + 1;
-      if (!reduceMotion) burst(c, r, MAT[t]);
+  const rows = new Set();
+  for (let r = 0; r < ROWS; r++) if (S.board[r].every(Boolean)) rows.add(r);
+  let boom = false;
+  if (rows.size){
+    // TNT: a cleared row holding TNT also blows away the row below it (chains).
+    let changed = true;
+    while (changed){
+      changed = false;
+      for (const r of [...rows]){
+        if (r + 1 < ROWS && !rows.has(r + 1) && S.board[r].includes('X')){ rows.add(r + 1); changed = true; boom = true; }
+      }
     }
-    const prevLevel = S.level;
-    S.score += [0, 100, 300, 500, 800][full.length] * S.level;
-    S.lines += full.length;
-    S.level = Math.floor(S.lines / 10) + 1;
-    sfx.clear(full.length);
-    if (S.level > prevLevel){ S.levelFlash = 1200; setTimeout(sfx.level, 260); }
+  }
+  if (rows.size){
+    const list = [...rows];
+    S.clearing = { rows: list, t: 0 };
+    for (const r of list) for (let c = 0; c < COLS; c++){
+      const t = S.board[r][c]; if (!t) continue;
+      const mat = MAT[t]; S.inv[mat] = (S.inv[mat] || 0) + 1;
+      if (!reduceMotion) burst(c, r, mat, t === 'X' ? 14 : 5);
+    }
+    const n = list.length, prevLevel = S.level;
+    S.score += ([0, 100, 300, 500, 800][Math.min(4, n)] + Math.max(0, n - 4) * 250) * S.level;
+    S.lines += n;
+    S.level = S.stage.start + Math.floor(S.lines / 10);
+    sfx.clear(n); if (boom) sfx.boom();
+    if (S.level > prevLevel){ flash(`等級 ${S.level}`); setTimeout(sfx.level, 260); }
     renderInv();
   } else {
     spawn();
@@ -463,67 +576,167 @@ function collapse(){
   const rows = S.clearing.rows.slice().sort((a, b) => b - a);
   for (const r of rows) S.board.splice(r, 1);
   for (let i = 0; i < rows.length; i++) S.board.unshift(Array(COLS).fill(null));
-  S.clearing = null; spawn();
+  S.clearing = null;
+  if (goalMet()){ stageClear(); return; }
+  spawn();
 }
-function burst(cx, cy, mat){
+function riseRow(){
+  if (S.board[0].some(Boolean)){ gameOver(); return; }
+  S.board.shift();
+  S.board.push(garbageRow(S.stage.riseMat || 'G'));
+  if (S.cur && collide(S.cur.m, S.cur.x, S.cur.y)){
+    S.cur.y--;
+    if (collide(S.cur.m, S.cur.x, S.cur.y)){ gameOver(); return; }
+  }
+  sfx.rise();
+}
+function burst(cx, cy, mat, n){
   const pal = PAL[mat];
-  for (let i = 0; i < 5; i++){
+  for (let i = 0; i < n; i++){
     S.parts.push({ x: cx + .2 + Math.random() * .6, y: cy + .2 + Math.random() * .6,
-      vx: (Math.random() - .5) * 7, vy: -2 - Math.random() * 6,
+      vx: (Math.random() - .5) * (n > 6 ? 14 : 7), vy: -2 - Math.random() * (n > 6 ? 9 : 6),
       s: .14 + Math.random() * .12, life: .7 + Math.random() * .5,
       col: pal[Math.floor(Math.random() * pal.length)] });
   }
 }
+function flash(text){ S.flashText = text; S.levelFlash = 1200; }
 
-/* ---------- flow ---------- */
-function showOverlay(kind){
-  ov.hidden = false; ovScore.hidden = true;
-  ovTitle.classList.toggle('lose', kind === 'over');
-  if (kind === 'title'){
-    ovTitle.textContent = '礦坑方塊';
-    ovText.innerHTML = '每種方塊都是一種礦物。<br>消除一行就往下挖一格。';
-    ovBtn.textContent = '開始挖礦';
-  } else if (kind === 'pause'){
-    ovTitle.textContent = '暫停中';
-    ovText.textContent = `目前深度 Y ${64 - S.lines}，分數 ${S.score.toLocaleString()}`;
-    ovBtn.textContent = '繼續挖';
-  } else {
-    ovTitle.textContent = '礦坑塌了！';
-    ovText.textContent = `挖到 Y ${64 - S.lines}，消除 ${S.lines} 行`;
-    ovScore.hidden = false; ovScore.textContent = S.score.toLocaleString() + ' 分';
-    ovBtn.textContent = '再挖一次';
-  }
-  ovBest.textContent = best ? `最高紀錄 ${best.toLocaleString()} 分` : '';
-  ovBtn.focus({ preventScroll: true });
+/* ---------- goals ---------- */
+function goalInfo(){
+  const g = S.stage.goal;
+  if (!g) return { text: `深度 Y ${64 - S.lines}`, p: null };
+  if (g.type === 'lines') return { text: `消除 ${Math.min(S.lines, g.n)} / ${g.n} 行`, p: S.lines / g.n };
+  if (g.type === 'collect'){ const c = S.inv[g.mat] || 0; return { text: `${MAT_NAME[g.mat]} ${Math.min(c, g.n)} / ${g.n} 顆`, p: c / g.n }; }
+  if (g.type === 'garbage'){ const rem = countGarbage(); return { text: `剩下 ${rem} 塊石頭`, p: S.garbage0 ? 1 - rem / S.garbage0 : 1 }; }
+  return { text: '', p: 0 };
 }
-function newGame(){
-  S.board = emptyBoard(); S.bag = []; S.queue = []; fillQueue();
-  S.hold = null; S.canHold = true; S.score = 0; S.lines = 0; S.level = 1;
-  S.inv = {}; S.parts = []; S.clearing = null; S.levelFlash = 0;
+function goalMet(){
+  const g = S.stage.goal; if (!g) return false;
+  if (g.type === 'lines') return S.lines >= g.n;
+  if (g.type === 'collect') return (S.inv[g.mat] || 0) >= g.n;
+  if (g.type === 'garbage') return countGarbage() === 0;
+  return false;
+}
+function starsFor(t, par){ return 1 + (t <= par * 1000 ? 1 : 0) + (t <= par * 700 ? 1 : 0); }
+function starHtml(n, cls = ''){ let s = ''; for (let i = 0; i < 3; i++) s += i < n ? '★' : '<i>★</i>'; return cls ? `<span class="${cls}">${s}</span>` : s; }
+const fmtTime = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+/* ---------- screens ---------- */
+function button(label, onClick, cls = ''){
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'mc-btn ' + cls; b.innerHTML = label;
+  b.addEventListener('click', () => { ensureAudio(); onClick(); });
+  return b;
+}
+function openCard(parts, focusSel){
+  card.innerHTML = ''; parts.forEach(p => card.append(p)); ov.hidden = false;
+  const f = card.querySelector(focusSel || '.primary') || card.querySelector('button:not(:disabled)');
+  if (f) f.focus({ preventScroll: true });
+  card.scrollTop = 0;
+}
+function el(tag, cls, html){ const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+function showMenu(){
+  S.state = 'menu'; releaseAll();
+  const grid = el('div', 'stages'), up = unlockedUpTo();
+  STAGES.forEach((st, i) => {
+    const locked = i > up;
+    const b = button(
+      `<span class="n">第 ${i + 1} 關</span><span class="t">${st.name}</span><span class="s">${locked ? '<i>未解鎖</i>' : starHtml(progress[i + 1] || 0)}</span>`,
+      () => showBriefing(i), 'stage-btn' + (i === up && !progress[i + 1] ? ' primary' : ''));
+    b.disabled = locked;
+    b.setAttribute('aria-label', `第 ${i + 1} 關 ${st.name}${locked ? '，未解鎖' : ''}`);
+    grid.append(b);
+  });
+  grid.append(button(`<span class="t">無盡模式</span><span class="n">${best ? '最高紀錄 ' + best.toLocaleString() + ' 分' : '沒有終點，挖越深越好'}</span>`,
+    () => startStage(-1), 'stage-btn endless'));
+  const total = STAGES.reduce((a, _, i) => a + (progress[i + 1] || 0), 0);
+  openCard([
+    el('h2', '', '選擇關卡'),
+    el('p', '', `每種方塊都是一種礦物。過關才能往下一層挖。目前 ★ ${total} / ${STAGES.length * 3}`),
+    grid,
+  ]);
+}
+function showBriefing(i){
+  const st = STAGES[i];
+  const row = el('div', 'row');
+  row.append(button('返回', showMenu), button('開始挖礦', () => startStage(i), 'primary'));
+  const rules = [];
+  if (st.dark) rules.push('看不清楚');
+  if (st.rise) rules.push(`每 ${st.rise / 1000} 秒上升一層`);
+  rules.push(`速度等級 ${st.start} 起跳`);
+  openCard([
+    el('p', '', `第 ${i + 1} 關`),
+    el('h2', '', st.name),
+    el('p', '', st.desc),
+    el('p', '', rules.join('・')),
+    el('p', '', `★★ ${fmtTime(st.par * 1000)} 內過關　★★★ ${fmtTime(st.par * 700)} 內過關`),
+    row,
+  ]);
+}
+function startStage(i){
+  const st = i < 0 ? ENDLESS : STAGES[i];
+  S.stage = st; S.stageIdx = i;
+  S.board = emptyBoard();
+  if (st.garbage){
+    const g = st.garbage;
+    for (let k = 0; k < g.rows; k++) S.board[ROWS - 1 - k] = garbageRow(g.mat, g.ore, g.rate);
+  }
+  S.garbage0 = countGarbage();
+  S.bag = []; S.queue = []; fillQueue();
+  S.hold = null; S.canHold = true; S.score = 0; S.lines = 0; S.level = st.start;
+  S.inv = {}; S.parts = []; S.clearing = null; S.levelFlash = 0; S.time = 0; S.riseT = 0;
   releaseAll(); renderInv(); spawn();
+  $('goalHead').textContent = i < 0 ? '無盡模式' : `第 ${i + 1} 關`;
+  $('goalName').textContent = i < 0 ? '挖得越深越好' : st.name;
   S.state = 'play'; ov.hidden = true;
+  flash(i < 0 ? '開挖！' : st.name);
+}
+function stageClear(){
+  S.state = 'won'; releaseAll(); sfx.win();
+  const i = S.stageIdx, st = S.stage, stars = starsFor(S.time, st.par);
+  const prev = progress[i + 1] || 0;
+  if (stars > prev){ progress[i + 1] = stars; save('mine-stack-progress', progress); }
+  const row = el('div', 'row');
+  row.append(button('關卡列表', showMenu), button('再玩一次', () => startStage(i)));
+  if (i + 1 < STAGES.length) row.append(button('下一關', () => showBriefing(i + 1), 'primary'));
+  else row.firstChild.classList.add('primary');
+  openCard([
+    el('h2', 'win', i + 1 < STAGES.length ? '過關！' : '全部通關！'),
+    el('div', 'stars', starHtml(stars)),
+    el('p', '', `${st.name}・用時 ${fmtTime(S.time)}・消除 ${S.lines} 行` + (stars < 3 ? `<br>${fmtTime(st.par * (stars < 2 ? 1000 : 700))} 內過關可以拿到下一顆星` : '')),
+    el('div', 'big', S.score.toLocaleString() + ' 分'),
+    row,
+  ]);
 }
 function gameOver(){
-  S.state = 'over'; releaseAll();
-  if (S.score > best){ best = S.score; saveBest(); }
-  sfx.over(); showOverlay('over');
+  if (S.state !== 'play') return;
+  S.state = 'over'; releaseAll(); sfx.over();
+  const endless = S.stageIdx < 0;
+  let note = '';
+  if (endless && S.score > best){ best = S.score; save('mine-stack-best', best); note = '新紀錄！'; }
+  const row = el('div', 'row');
+  row.append(button('關卡列表', showMenu), button(endless ? '再挖一次' : '重試這關', () => startStage(S.stageIdx), 'primary'));
+  openCard([
+    el('h2', 'lose', '礦坑塌了！'),
+    el('p', '', endless ? `挖到 Y ${64 - S.lines}，消除 ${S.lines} 行` : `${S.stage.name}・${goalInfo().text}`),
+    el('div', 'big', S.score.toLocaleString() + ' 分' + (note ? '　' + note : '')),
+    row,
+  ]);
 }
-function togglePause(){
-  if (S.state === 'play'){ S.state = 'paused'; releaseAll(); showOverlay('pause'); }
-  else if (S.state === 'paused'){ S.state = 'play'; ov.hidden = true; }
+function pause(){
+  if (S.state !== 'play') return;
+  S.state = 'paused'; releaseAll();
+  const row = el('div', 'row');
+  row.append(button('關卡列表', showMenu), button('重新開始', () => startStage(S.stageIdx)), button('繼續', resume, 'primary'));
+  openCard([el('h2', '', '暫停中'), el('p', '', `${S.stage.name}・${goalInfo().text}・${fmtTime(S.time)}`), row]);
 }
-ovBtn.addEventListener('click', () => {
-  ensureAudio();
-  if (S.state === 'paused') togglePause(); else newGame();
-  ovBtn.blur();
-});
-$('pauseBtn').addEventListener('click', e => { ensureAudio(); togglePause(); e.currentTarget.blur(); });
+function resume(){ if (S.state === 'paused'){ S.state = 'play'; ov.hidden = true; } }
+
+$('pauseBtn').addEventListener('click', e => { ensureAudio(); if (S.state === 'play') pause(); else if (S.state === 'paused') resume(); e.currentTarget.blur(); });
 $('soundBtn').addEventListener('click', e => {
-  soundOn = !soundOn; ensureAudio(); paintSoundBtn();
-  try { localStorage.setItem('mine-stack-sound', soundOn ? 'on' : 'off'); } catch (err) {}
-  e.currentTarget.blur();
+  soundOn = !soundOn; ensureAudio(); paintSoundBtn(); save('mine-stack-sound2', soundOn); e.currentTarget.blur();
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && S.state === 'play') togglePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
 /* ---------- input ---------- */
 const DAS = 160, ARR = 45;
@@ -546,7 +759,7 @@ function handleHeld(dt){
     tmr[d] += dt;
     if (tmr[d] >= DAS){
       acc[d] += dt;
-      while (acc[d] >= ARR){ acc[d] -= ARR; if (!move(d === 'left' ? -1 : 1)) { acc[d] = 0; break; } }
+      while (acc[d] >= ARR){ acc[d] -= ARR; if (!move(d === 'left' ? -1 : 1)){ acc[d] = 0; break; } }
     }
   }
 }
@@ -557,14 +770,13 @@ function action(a){
   else if (a === 'drop') hardDrop();
   else if (a === 'hold') doHold();
 }
-
 addEventListener('keydown', e => {
   const k = e.key;
-  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
   ensureAudio();
-  if (S.state === 'title' || S.state === 'over'){ if (k === 'Enter' || k === ' ') newGame(); return; }
-  if (k === 'p' || k === 'P' || k === 'Escape'){ togglePause(); return; }
-  if (S.state === 'paused'){ if (k === 'Enter' || k === ' ') togglePause(); return; }
+  if (S.state === 'paused'){ if (k === 'p' || k === 'P' || k === 'Escape'){ e.preventDefault(); resume(); } return; }
+  if (S.state !== 'play') return;
+  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
+  if (k === 'p' || k === 'P' || k === 'Escape'){ pause(); return; }
   if (e.repeat) return;
   switch (k){
     case 'ArrowLeft': press('left'); break;
@@ -603,6 +815,7 @@ boardCv.addEventListener('pointerdown', e => { if (S.state === 'play'){ e.preven
 
 /* ---------- drawing ---------- */
 let cs = 24, dpr = 1;
+const FONT = getComputedStyle(document.documentElement).getPropertyValue('--font');
 function drawCell(ctx, mat, x, y, s, alpha = 1){
   ctx.globalAlpha = alpha;
   ctx.drawImage(TEX[mat], x, y, s, s);
@@ -633,10 +846,10 @@ function prep(ctx){ ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEn
 
 function drawBoard(){
   const ctx = bctx; prep(ctx);
-  const W = cs * COLS, H = cs * ROWS;
+  const W = cs * COLS, H = cs * ROWS, bg = TEX[S.stage.bg] || TEX.stone;
   ctx.fillStyle = '#0c0d10'; ctx.fillRect(0, 0, W, H);
   ctx.globalAlpha = .26;
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) ctx.drawImage(TEX.deepslate, x * cs, y * cs, cs, cs);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) ctx.drawImage(bg, x * cs, y * cs, cs, cs);
   ctx.globalAlpha = 1;
   ctx.fillStyle = 'rgba(0,0,0,.35)';
   for (let x = 1; x < COLS; x++) ctx.fillRect(x * cs, 0, 1, H);
@@ -650,7 +863,6 @@ function drawBoard(){
     for (const r of S.clearing.rows){
       ctx.fillStyle = `rgba(255,255,255,${reduceMotion ? .4 : (.75 * (1 - k)) * (Math.floor(S.clearing.t / 60) % 2 ? 1 : .5)})`;
       ctx.fillRect(0, r * cs, W, cs);
-      // crack lines while breaking
       ctx.fillStyle = 'rgba(0,0,0,.55)';
       const stage = Math.min(4, Math.floor(k * 5));
       for (let x = 0; x < COLS; x++) for (let i = 0; i < stage; i++){
@@ -659,7 +871,8 @@ function drawBoard(){
       }
     }
   }
-  if (S.cur && S.state !== 'over'){
+  const playing = S.state === 'play' || S.state === 'paused';
+  if (S.cur && playing){
     const gy = ghostY(), m = S.cur.m, mat = MAT[S.cur.type];
     for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++){
       if (!m[r][c] || gy + r < 0) continue;
@@ -672,6 +885,7 @@ function drawBoard(){
       if (!m[r][c] || S.cur.y + r < 0) continue;
       drawCell(ctx, mat, (S.cur.x + c) * cs, (S.cur.y + r) * cs, cs);
     }
+    S.torch.x = S.cur.x + m.length / 2; S.torch.y = Math.max(0, S.cur.y) + m.length / 2;
   }
   for (const p of S.parts){
     ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2));
@@ -680,14 +894,28 @@ function drawBoard(){
     ctx.fillRect(p.x * cs - s / 2, p.y * cs - s / 2, s, s);
   }
   ctx.globalAlpha = 1;
+  if (S.stage.dark && playing){
+    const tx = S.torch.x * cs, ty = S.torch.y * cs;
+    const flick = reduceMotion ? 0 : Math.sin(performance.now() / 90) * .15 * cs;
+    const g = ctx.createRadialGradient(tx, ty, cs * .6, tx, ty, cs * 3.6 + flick);
+    g.addColorStop(0, 'rgba(255,190,90,.06)');
+    g.addColorStop(.55, 'rgba(6,5,8,.55)');
+    g.addColorStop(1, 'rgba(4,4,6,.95)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  if (S.stage.rise && playing){
+    const p = Math.min(1, S.riseT / S.stage.rise);
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, H - 4, W, 4);
+    ctx.fillStyle = p > .8 ? '#ff6a1a' : '#c0402a'; ctx.fillRect(0, H - 4, W * p, 4);
+  }
   if (S.levelFlash > 0){
     const a = Math.min(1, S.levelFlash / 400);
     ctx.globalAlpha = a;
     ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(0, H / 2 - cs * 1.2, W, cs * 2.4);
     ctx.fillStyle = '#46d47d';
-    ctx.font = `${Math.round(cs * .95)}px ${getComputedStyle(document.documentElement).getPropertyValue('--font')}`;
+    ctx.font = `${Math.round(cs * .95)}px ${FONT}`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(`等級 ${S.level}`, W / 2, H / 2);
+    ctx.fillText(S.flashText, W / 2, H / 2);
     ctx.globalAlpha = 1;
   }
 }
@@ -704,17 +932,25 @@ function drawSide(){
 }
 let lastStats = '';
 function renderStats(){
-  const key = `${S.score}|${S.level}|${S.lines}`;
+  const gi = goalInfo();
+  const riseLeft = S.stage.rise ? Math.ceil((S.stage.rise - S.riseT) / 1000) : 0;
+  const key = `${S.score}|${S.level}|${S.lines}|${Math.floor(S.time / 1000)}|${gi.text}|${riseLeft}|${S.stageIdx}`;
   if (key === lastStats) return; lastStats = key;
   $('sScore').textContent = S.score.toLocaleString();
   $('sLevel').textContent = S.level;
   $('sLines').textContent = S.lines;
-  $('sDepth').textContent = 'Y ' + Math.max(-64, 64 - S.lines);
+  $('sTime').textContent = fmtTime(S.time);
+  $('goalText').textContent = gi.text;
+  $('goalBar').hidden = gi.p == null;
+  if (gi.p != null) $('goalFill').style.width = Math.round(Math.max(0, Math.min(1, gi.p)) * 100) + '%';
+  $('goalRise').hidden = !S.stage.rise;
+  if (S.stage.rise) $('goalRise').textContent = `${riseLeft} 秒後上升`;
 }
 function renderInv(){
-  TYPES.forEach(t => {
-    const n = S.inv[t] || 0, el = slotEls[t];
-    el.classList.toggle('empty', !n); el.querySelector('span').textContent = n;
+  INV_ORDER.forEach(m => {
+    const n = S.inv[m] || 0, e = slotEls[m];
+    e.classList.toggle('empty', !n); e.querySelector('span').textContent = n;
+    e.hidden = !INV_ALWAYS.has(m) && !n;
   });
 }
 
@@ -725,8 +961,13 @@ function update(dt){
   S.parts = S.parts.filter(p => p.life > 0 && p.y < ROWS + 2);
   if (S.levelFlash > 0) S.levelFlash -= dt;
   if (S.state !== 'play') return;
+  S.time += dt;
   if (S.clearing){ S.clearing.t += dt; if (S.clearing.t >= 320) collapse(); return; }
   if (!S.cur) return;
+  if (S.stage.rise){
+    S.riseT += dt;
+    if (S.riseT >= S.stage.rise){ S.riseT = 0; riseRow(); if (S.state !== 'play') return; }
+  }
   handleHeld(dt);
   if (!S.cur) return;
   const g = held.down ? Math.min(40, gravityMs()) : gravityMs();
@@ -751,7 +992,7 @@ function frame(now){
 
 /* ---------- boot ---------- */
 S.board = demoBoard(); fillQueue();
-renderInv(); showOverlay('title');
+renderInv(); showMenu();
 resize();
 new ResizeObserver(resize).observe(well);
 addEventListener('resize', resize);
